@@ -1,0 +1,2465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Secure VPN</title>
+    <style>
+        :root {
+            --bg-color: #131314;
+            --surface-color: #262628;
+            --primary-color: #6F32F2;
+            --primary-transparent: rgba(111, 50, 242, 0.1);
+            --secondary-color: #25C74B;
+            --text-primary: #ffffff;
+            --text-secondary: #9e9e9e;
+            --error-color: #ff5252;
+            --warning-color: #ff9800;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background-color: var(--bg-color);
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        /* Common Elements */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background-color: var(--bg-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-primary, .btn-outline {
+            width: 100%;
+            padding: 14px;
+            border-radius: 24px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--text-secondary);
+            color: var(--text-primary);
+        }
+
+        .btn-primary:active, .btn-outline:active {
+            opacity: 0.8;
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+            width: 100%;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 16px;
+            background-color: transparent;
+            border: 1px solid var(--text-secondary);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 16px;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .card {
+            background-color: var(--surface-color);
+            border-radius: 24px;
+            padding: 20px;
+            margin-bottom: 16px;
+            width: 100%;
+        }
+
+        /* Login Screen */
+        #login-screen {
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .login-logo {
+            font-size: 80px;
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .error-msg {
+            color: var(--error-color);
+            font-size: 14px;
+            margin-top: 8px;
+            text-align: center;
+            display: none;
+        }
+
+        .divider {
+            text-align: center;
+            margin: 24px 0;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Main Screen */
+        #main-screen .content {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-grow: 1;
+        }
+
+        .status-text {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .status-sub {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 32px;
+        }
+
+        .connect-btn-wrapper {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background-color: rgba(158, 158, 158, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 40px;
+            cursor: pointer;
+            transition: background-color 0.5s;
+        }
+
+        .connect-btn {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background-color: var(--surface-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+            color: var(--text-primary);
+            transition: all 0.5s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .connect-btn-wrapper.connected {
+            background-color: rgba(37, 199, 75, 0.2);
+        }
+        .connect-btn-wrapper.connected .connect-btn {
+            background-color: var(--secondary-color);
+            color: #000;
+        }
+
+        .connect-btn-wrapper.connecting .connect-btn {
+            background-color: #ff9800;
+            color: white;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(0.95); }
+        }
+
+        .speed-dashboard {
+            display: flex;
+            width: 100%;
+            justify-content: space-around;
+            margin-bottom: 32px;
+        }
+
+        .speed-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .speed-label {
+            display: flex;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .speed-value {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .server-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .server-info {
+            display: flex;
+            align-items: center;
+        }
+
+        .server-flag {
+            font-size: 32px;
+            margin-right: 16px;
+        }
+
+        .server-ping {
+            font-weight: 700;
+        }
+
+        .ping-good { color: var(--secondary-color); }
+        .ping-bad { color: var(--warning-color); }
+
+        .switch-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--text-secondary);
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--primary-color); }
+        input:checked + .slider:before { transform: translateX(22px); }
+        input:disabled + .slider { opacity: 0.5; cursor: not-allowed; }
+
+        /* Premium Screen */
+        #premium-screen .content {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .premium-icon {
+            font-size: 80px;
+            color: var(--secondary-color);
+            margin-bottom: 16px;
+        }
+
+        .features-list {
+            width: 100%;
+            margin-bottom: 32px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+
+        .feature-item i {
+            color: var(--secondary-color);
+            margin-right: 12px;
+            font-size: 20px;
+        }
+
+        .plans {
+            display: flex;
+            width: 100%;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .plan-card {
+            flex: 1;
+            background-color: var(--surface-color);
+            border: 2px solid transparent;
+            border-radius: 16px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .plan-card.selected {
+            background-color: var(--primary-transparent);
+            border-color: var(--primary-color);
+        }
+
+        .plan-price {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-top: 8px;
+        }
+        
+        .plan-save {
+            font-size: 12px;
+            color: var(--secondary-color);
+            font-weight: 500;
+            margin-top: 4px;
+        }
+
+        .upi-card {
+            text-align: center;
+            padding: 20px;
+        }
+
+        /* Bottom Sheet & Dialog */
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .overlay.active { display: flex; }
+
+        .bottom-sheet {
+            position: fixed;
+            bottom: -100%;
+            left: 0;
+            width: 100%;
+            background: var(--bg-color);
+            border-radius: 24px 24px 0 0;
+            padding: 24px;
+            transition: bottom 0.3s;
+            z-index: 101;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .bottom-sheet.active { bottom: 0; }
+
+        
+        @keyframes fadeInSlide {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .server-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 8px;
+            border-bottom: 1px solid var(--surface-color);
+            cursor: pointer;
+            opacity: 0;
+            animation: fadeInSlide 0.3s ease forwards;
+        }
+
+        .premium-tag {
+            color: #FFC107;
+            font-size: 16px;
+            margin-left: 8px;
+        }
+
+        .dialog {
+            background: var(--surface-color);
+            border-radius: 24px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            z-index: 101;
+            display: none;
+        }
+        .dialog.active { display: block; }
+        
+        .dialog h2 { margin-bottom: 16px; font-size: 20px; }
+        .dialog p { color: var(--text-secondary); margin-bottom: 24px; line-height: 1.5; }
+        .dialog-actions { display: flex; justify-content: flex-end; }
+        .dialog-btn {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 8px 16px;
+        }
+
+    </style>
+    <!-- Use FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Latency Graph -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- D3.js for Map -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson-client@3"></script>
+</head>
+<body>
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen" class="screen active">
+        <div class="header" style="justify-content: center;">
+            <h1 data-i18n="loginTitle">Secure VPN - Login</h1>
+        </div>
+        
+        <div class="login-logo">
+            <i class="fa-solid fa-shield-halved"></i>
+        </div>
+
+        <div class="input-group">
+            <input type="text" id="username" class="input-field" placeholder="Email (Gmail) or Mobile Number" data-i18n-placeholder="loginEmail">
+        </div>
+        <div class="input-group">
+            <input type="password" id="password" class="input-field" placeholder="Password" data-i18n-placeholder="loginPassword">
+        </div>
+        <div id="login-error" class="error-msg" data-i18n="loginError">Please enter email/mobile and password</div>
+        
+        <button class="btn-primary" style="margin-top: 16px;" onclick="handleLogin()" data-i18n="loginBtn">Login</button>
+        
+        <div class="divider" data-i18n="loginOr">OR</div>
+        
+        <button class="btn-outline" onclick="handleLogin()">
+            <i class="fa-brands fa-google" style="margin-right: 8px;"></i> <span data-i18n="loginGoogle">Continue with Google</span>
+        </button>
+    </div>
+
+    <!-- MAIN SCREEN -->
+    <div id="main-screen" class="screen">
+        <div class="header">
+            <h1 data-i18n="mainTitle">Secure VPN</h1>
+            <div>
+                <button class="icon-btn" id="premium-icon-btn" onclick="navigateTo('premium-screen')" style="color: #FFC107;">
+                    <i class="fa-solid fa-crown"></i>
+                </button>
+                <button class="icon-btn" onclick="showDialog('privacy-dialog')">
+                    <i class="fa-solid fa-shield"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="content">
+            <div id="status-title" class="status-text">Not Connected</div>
+            <div id="status-desc" class="status-sub">Tap the button to secure your connection.</div>
+
+            <div class="connect-btn-wrapper" id="connect-wrapper" onclick="toggleConnection()">
+                <div class="connect-btn" id="connect-btn">
+                    <i class="fa-solid fa-power-off"></i>
+                </div>
+            </div>
+
+            <div class="speed-dashboard">
+                <div class="speed-item">
+                    <div class="speed-label">
+                        <i class="fa-solid fa-arrow-down" style="color: var(--secondary-color); margin-right: 4px;"></i> <span data-i18n="download">Download</span>
+                    </div>
+                    <div class="speed-value" id="download-speed">0.0 MB/s</div>
+                </div>
+                <div class="speed-item">
+                    <div class="speed-label">
+                        <i class="fa-solid fa-arrow-up" style="color: #2196F3; margin-right: 4px;"></i> <span data-i18n="upload">Upload</span>
+                    </div>
+                    <div class="speed-value" id="upload-speed">0.0 MB/s</div>
+                </div>
+            </div>
+
+            <div class="card" id="chart-card">
+                <div style="font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--text-secondary);" data-i18n="latency">Latency (ms) - Last 60s</div>
+                <div style="position: relative; height: 120px; width: 100%;">
+                    <canvas id="latencyChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card" id="data-usage-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="font-size: 14px; font-weight: 700; color: var(--text-secondary);" data-i18n="dataUsage">Data Usage (Session)</div>
+                    <button id="run-speed-test-btn" style="background: none; border: 1px solid var(--primary-color); color: var(--primary-color); border-radius: 12px; padding: 4px 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;" onclick="runManualSpeedTest()" data-i18n="runSpeedTest">Run Speed Test</button>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" data-i18n="downloaded">Downloaded</div>
+                        <div style="font-size: 18px; font-weight: 700; color: var(--secondary-color);" id="data-downloaded">0.00 MB</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" data-i18n="uploaded">Uploaded</div>
+                        <div style="font-size: 18px; font-weight: 700; color: #2196F3;" id="data-uploaded">0.00 MB</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" data-i18n="totalUsage">Total</div>
+                        <div style="font-size: 18px; font-weight: 700;" id="data-total">0.00 MB</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="map-card" style="padding: 16px 0;">
+                <div style="font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--text-secondary); padding: 0 16px;" data-i18n="connectionMap">Connection Map</div>
+                <div id="map-container" style="width: 100%; height: 200px; position: relative;"></div>
+            </div>
+
+            <div class="card server-card" onclick="openServerList()">
+                <div class="server-info">
+                    <div class="server-flag" id="current-flag">🇺🇸</div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" data-i18n="currentServer">Current Server</div>
+                        <div style="font-size: 18px; font-weight: 700;" id="current-server-name">United States</div>
+                    </div>
+                </div>
+                <div class="server-ping ping-good" id="current-ping">45 ms</div>
+            </div>
+
+            <div class="card" style="display: flex; flex-direction: column; gap: 16px;">
+                
+                
+                
+                
+                <div class="switch-card">
+                    <div>
+                        <div style="font-size: 18px; font-weight: 700;" data-i18n="dnsSettings">DNS Settings</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" data-i18n="dnsSettingsDesc">Select your preferred DNS resolver</div>
+                    </div>
+                    <select id="dns-select" class="input-field" style="width: auto; padding: 4px 8px;" onchange="state.dns = this.value; localStorage.setItem('dns', this.value)">
+                        <option value="automatic" data-i18n="dnsAutomatic">Automatic</option>
+                        <option value="8.8.8.8">Google (8.8.8.8)</option>
+                        <option value="1.1.1.1">Cloudflare (1.1.1.1)</option>
+                    </select>
+                </div>
+                <div class="switch-card">
+                    <div>
+                        <div style="font-size: 18px; font-weight: 700;" data-i18n="systemTheme">System Theme</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" data-i18n="systemThemeDesc">Auto-switch between dark and light modes</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="system-theme-switch" onchange="toggleSystemTheme(this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="switch-card">
+                    <div>
+                        <div style="font-size: 18px; font-weight: 700;" data-i18n="autoReconnect">Auto-Reconnect</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" data-i18n="autoReconnectDesc">Reconnect automatically if dropped</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="auto-reconnect-switch" onchange="state.autoReconnect = this.checked; localStorage.setItem('autoReconnect', this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="switch-card">
+                    <div>
+                        <div style="font-size: 18px; font-weight: 700;" data-i18n="biometricLock">Biometric Lock</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" data-i18n="biometricLockDesc">Require fingerprint/face to toggle connection</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="biometric-switch" onchange="state.biometricLock = this.checked">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="switch-card">
+                    <div>
+                        <div style="font-size: 18px; font-weight: 700;" data-i18n="smartProxy">Smart Proxy</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" data-i18n="smartProxyDesc">Route app traffic via proxy</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="proxy-switch">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="switch-card">
+                    <div>
+                        <div style="font-size: 18px; font-weight: 700;" data-i18n="killSwitch">Kill Switch</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" data-i18n="killSwitchDesc">Block internet if VPN drops</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="kill-switch">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="switch-card">
+                    <div>
+                        <div style="font-size: 18px; font-weight: 700;" data-i18n="batterySaver">Battery Saver</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" data-i18n="batterySaverDesc">Reduce animations when disconnected</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="battery-saver-switch" onchange="state.batterySaver = this.checked">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="switch-card">
+                    <div>
+                        <div style="font-size: 18px; font-weight: 700;" data-i18n="launchStartup">Launch at Startup</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" data-i18n="launchStartupDesc">Connect automatically on open</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="launch-startup-switch" onchange="state.launchAtStartup = this.checked; localStorage.setItem('launchAtStartup', this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="switch-card">
+                    <div>
+                        <div style="font-size: 18px; font-weight: 700;" data-i18n="language">Language</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" data-i18n="languageDesc">Select app language</div>
+                    </div>
+                    <select id="language-select" class="input-field" style="width: auto; padding: 4px 8px;" onchange="changeLanguage(this.value)">
+                        <option value="en">English</option>
+                        <option value="es">Español</option>
+                        <option value="fr">Français</option>
+                        <option value="de">Deutsch</option>
+                    </select>
+                </div>
+
+                <div class="switch-card" style="cursor: pointer;" onclick="showDialog('faq-dialog')">
+                    <div>
+                        <div style="font-size: 18px; font-weight: 700;" data-i18n="faqTitle">FAQ</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" data-i18n="faqDesc">Common questions & support</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right" style="color: var(--text-secondary);"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PREMIUM SCREEN -->
+    <div id="premium-screen" class="screen">
+        <div class="header">
+            <button class="icon-btn" onclick="navigateTo('main-screen')">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <h1 data-i18n="premiumTitle">ProtonVPN Plus</h1>
+            <div style="width: 40px;"></div>
+        </div>
+
+        <div class="content">
+            <div class="premium-icon">
+                <i class="fa-solid fa-crown"></i>
+            </div>
+            <div style="font-size: 28px; font-weight: 700; margin-bottom: 8px;" data-i18n="upgradePlus">Upgrade to Plus</div>
+            <div style="color: var(--text-secondary); margin-bottom: 24px; text-align: center;" data-i18n="upgradeDesc">Get the most out of your privacy.</div>
+
+            <div class="features-list">
+                <div class="feature-item"><i class="fa-solid fa-circle-check"></i> <span data-i18n="feat1">Highest speed servers (up to 10 Gbps)</span></div>
+                <div class="feature-item"><i class="fa-solid fa-circle-check"></i> <span data-i18n="feat2">Protect up to 10 devices at once</span></div>
+                <div class="feature-item"><i class="fa-solid fa-circle-check"></i> <span data-i18n="feat3">Strict no-logs policy</span></div>
+                <div class="feature-item"><i class="fa-solid fa-circle-check"></i> <span data-i18n="feat4">Access blocked content & streaming</span></div>
+            </div>
+
+            <div class="plans">
+                <div class="plan-card selected" id="plan-1" onclick="selectPlan(1)">
+                    <div data-i18n="month1">1 Month</div>
+                    <div class="plan-price">₹49</div>
+                </div>
+                <div class="plan-card" id="plan-2" onclick="selectPlan(2)">
+                    <div data-i18n="year1">1 Year</div>
+                    <div class="plan-price">₹299</div>
+                    <div class="plan-save" data-i18n="save49">Save 49%</div>
+                </div>
+            </div>
+
+            <div class="card upi-card">
+                <div style="font-weight: 700; margin-bottom: 8px;" data-i18n="payUpi">Pay via UPI</div>
+                <div style="font-size: 16px; font-weight: 700;">amresh923417das1674-1@okhdfcbank</div>
+            </div>
+
+            <div class="input-group" style="margin-top: 16px;">
+                <input type="text" id="transaction-id" class="input-field" placeholder="Enter UTR / Transaction ID" data-i18n-placeholder="utrPlaceholder" oninput="checkTransactionInput()">
+            </div>
+
+            <button class="btn-primary" id="verify-btn" onclick="verifyPayment()" disabled>
+                <span id="verify-text" data-i18n="verifyBtn">Verify Payment</span>
+                <i class="fa-solid fa-spinner fa-spin" id="verify-spinner" style="display: none;"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- OVERLAYS -->
+    <div class="overlay" id="main-overlay" onclick="closeAllOverlays(event)">
+        
+        <!-- Server List -->
+        <div class="bottom-sheet" id="server-list" onclick="event.stopPropagation()">
+            <h2 style="margin-bottom: 16px; font-size: 20px;" data-i18n="selectServer">Select Server</h2>
+            <div class="input-group" style="margin-bottom: 16px;">
+                <input type="text" id="server-search" class="input-field" placeholder="Search by name or country..." data-i18n-placeholder="searchPlaceholder" oninput="filterServers()">
+            </div>
+            <div id="servers-container" style="max-height: 300px; overflow-y: auto;">
+                <!-- Servers injected by JS -->
+            </div>
+        </div>
+
+        <!-- Privacy Dialog -->
+        <div class="dialog" id="privacy-dialog" onclick="event.stopPropagation()">
+            <h2 data-i18n="privacyTitle">Privacy Policy</h2>
+            <p data-i18n="privacyDesc">We value your privacy. This VPN application does not log your browsing history, traffic destination, data content, or DNS queries. Your connection is highly secured and encrypted. We ensure high-speed data transmission while maintaining strict privacy standards.</p>
+            <div class="dialog-actions">
+                <button class="dialog-btn" onclick="closeAllOverlays()" data-i18n="iAgree">I Agree</button>
+            </div>
+        </div>
+
+        
+        <!-- FAQ Dialog -->
+        <div class="dialog" id="faq-dialog" onclick="event.stopPropagation()">
+            <h2 data-i18n="faqTitle" style="text-align: left; margin-bottom: 8px;">FAQ</h2>
+            <div class="accordion">
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span data-i18n="faqQ1">How secure is my connection?</span>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
+                    <div class="accordion-content">
+                        <p data-i18n="faqA1">Your connection is secured with military-grade AES-256 encryption. We also support advanced protocols like WireGuard and OpenVPN to ensure your data remains completely private.</p>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span data-i18n="faqQ2">Do you keep any logs?</span>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
+                    <div class="accordion-content">
+                        <p data-i18n="faqA2">No. We have a strict zero-logs policy. We do not track, collect, or share your browsing history, traffic destination, or DNS queries.</p>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span data-i18n="faqQ3">Will the VPN slow down my internet?</span>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
+                    <div class="accordion-content">
+                        <p data-i18n="faqA3">While any VPN can slightly reduce speeds due to encryption overhead, our ultra-fast servers (up to 10 Gbps) ensure you experience minimal impact on speed or latency.</p>
+                    </div>
+                </div>
+            
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span data-i18n="faqQ4">Connectivity Tips</span>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
+                    <div class="accordion-content">
+                        <p data-i18n="faqA4">If you experience high latency or connection drops, try switching your protocol (e.g., swapping between WireGuard and OpenVPN) in settings, or select a different server.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="dialog-actions" style="margin-top: 16px;">
+                <button class="dialog-btn" onclick="closeAllOverlays()" data-i18n="closeBtn">Close</button>
+            </div>
+        </div>
+
+        <!-- Success Dialog -->
+        <div class="dialog" id="success-dialog" onclick="event.stopPropagation()">
+            <h2 data-i18n="paymentVerified">Payment Verified</h2>
+            <p data-i18n="welcomePlus">Welcome to Plus! Your premium plan is now active.</p>
+            <div class="dialog-actions">
+                <button class="dialog-btn" onclick="activatePremium()" data-i18n="continueBtn">Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const translations = {
+            en: {
+                notConnected: "Not Connected",
+                tapToSecure: "Tap the button to secure your connection.",
+                connecting: "Connecting...",
+                connectingDesc: "Connecting to server...",
+                connected: "Connected securely",
+                connectedDesc: "Your traffic is encrypted and routed securely.",
+                download: "Download",
+                loginTitle: "Secure VPN - Login",
+                loginEmail: "Email (Gmail) or Mobile Number",
+                loginPassword: "Password",
+                loginError: "Please enter email/mobile and password",
+                loginBtn: "Login",
+                loginOr: "OR",
+                loginGoogle: "Continue with Google",
+                mainTitle: "Secure VPN",
+                premiumTitle: "ProtonVPN Plus",
+                upgradePlus: "Upgrade to Plus",
+                upgradeDesc: "Get the most out of your privacy.",
+                feat1: "Highest speed servers (up to 10 Gbps)",
+                feat2: "Protect up to 10 devices at once",
+                feat3: "Strict no-logs policy",
+                feat4: "Access blocked content & streaming",
+                month1: "1 Month",
+                year1: "1 Year",
+                save49: "Save 49%",
+                payUpi: "Pay via UPI",
+                utrPlaceholder: "Enter UTR / Transaction ID",
+                verifyBtn: "Verify Payment",
+                privacyTitle: "Privacy Policy",
+                privacyDesc: "We value your privacy. This VPN application does not log your browsing history, traffic destination, data content, or DNS queries. Your connection is highly secured and encrypted. We ensure high-speed data transmission while maintaining strict privacy standards.",
+                iAgree: "I Agree",
+                paymentVerified: "Payment Verified",
+                welcomePlus: "Welcome to Plus! Your premium plan is now active.",
+                continueBtn: "Continue",
+                biometricLock: "Biometric Lock",
+                biometricLockDesc: "Require fingerprint/face to toggle connection",
+                dataUsage: "Data Usage (Session)",
+                downloaded: "Downloaded",
+                uploaded: "Uploaded",
+                totalUsage: "Total",
+                autoReconnect: "Auto-Reconnect",
+                autoReconnectDesc: "Reconnect automatically if dropped",
+                highPingWarning: "High latency detected. Performance may be degraded.",
+                systemTheme: "System Theme",
+                systemThemeDesc: "Auto-switch between dark and light modes",
+                dnsSettings: "DNS Settings",
+                dnsSettingsDesc: "Select your preferred DNS resolver",
+                dnsAutomatic: "Automatic",
+                faqTitle: "FAQ",
+                faqDesc: "Common questions & support",
+                faqQ1: "How secure is my connection?",
+                faqA1: "Your connection is secured with military-grade AES-256 encryption. We also support advanced protocols like WireGuard and OpenVPN to ensure your data remains completely private.",
+                faqQ2: "Do you keep any logs?",
+                faqA2: "No. We have a strict zero-logs policy. We do not track, collect, or share your browsing history, traffic destination, or DNS queries.",
+                faqQ3: "Will the VPN slow down my internet?",
+                faqA3: "While any VPN can slightly reduce speeds due to encryption overhead, our ultra-fast servers (up to 10 Gbps) ensure you experience minimal impact on speed or latency.",
+                faqQ4: "Connectivity Tips",
+                faqA4: "If you experience high latency or connection drops, try switching your protocol (e.g., swapping between WireGuard and OpenVPN) in settings, or select a different server.",
+                closeBtn: "Close",
+                runSpeedTest: "Run Speed Test",
+                speedTestRunning: "Testing...",
+                fastest: "Fastest",
+                recentServers: "Recent Servers",
+                allServers: "All Servers",
+                upload: "Upload",
+                loginTitle: "Secure VPN - Login",
+                loginEmail: "Email (Gmail) or Mobile Number",
+                loginPassword: "Password",
+                loginError: "Please enter email/mobile and password",
+                loginBtn: "Login",
+                loginOr: "OR",
+                loginGoogle: "Continue with Google",
+                mainTitle: "Secure VPN",
+                premiumTitle: "ProtonVPN Plus",
+                upgradePlus: "Upgrade to Plus",
+                upgradeDesc: "Get the most out of your privacy.",
+                feat1: "Highest speed servers (up to 10 Gbps)",
+                feat2: "Protect up to 10 devices at once",
+                feat3: "Strict no-logs policy",
+                feat4: "Access blocked content & streaming",
+                month1: "1 Month",
+                year1: "1 Year",
+                save49: "Save 49%",
+                payUpi: "Pay via UPI",
+                utrPlaceholder: "Enter UTR / Transaction ID",
+                verifyBtn: "Verify Payment",
+                privacyTitle: "Privacy Policy",
+                privacyDesc: "We value your privacy. This VPN application does not log your browsing history, traffic destination, data content, or DNS queries. Your connection is highly secured and encrypted. We ensure high-speed data transmission while maintaining strict privacy standards.",
+                iAgree: "I Agree",
+                paymentVerified: "Payment Verified",
+                welcomePlus: "Welcome to Plus! Your premium plan is now active.",
+                continueBtn: "Continue",
+                biometricLock: "Biometric Lock",
+                biometricLockDesc: "Require fingerprint/face to toggle connection",
+                dataUsage: "Data Usage (Session)",
+                downloaded: "Downloaded",
+                uploaded: "Uploaded",
+                totalUsage: "Total",
+                autoReconnect: "Auto-Reconnect",
+                autoReconnectDesc: "Reconnect automatically if dropped",
+                highPingWarning: "High latency detected. Performance may be degraded.",
+                systemTheme: "System Theme",
+                systemThemeDesc: "Auto-switch between dark and light modes",
+                dnsSettings: "DNS Settings",
+                dnsSettingsDesc: "Select your preferred DNS resolver",
+                dnsAutomatic: "Automatic",
+                faqTitle: "FAQ",
+                faqDesc: "Common questions & support",
+                faqQ1: "How secure is my connection?",
+                faqA1: "Your connection is secured with military-grade AES-256 encryption. We also support advanced protocols like WireGuard and OpenVPN to ensure your data remains completely private.",
+                faqQ2: "Do you keep any logs?",
+                faqA2: "No. We have a strict zero-logs policy. We do not track, collect, or share your browsing history, traffic destination, or DNS queries.",
+                faqQ3: "Will the VPN slow down my internet?",
+                faqA3: "While any VPN can slightly reduce speeds due to encryption overhead, our ultra-fast servers (up to 10 Gbps) ensure you experience minimal impact on speed or latency.",
+                faqQ4: "Connectivity Tips",
+                faqA4: "If you experience high latency or connection drops, try switching your protocol (e.g., swapping between WireGuard and OpenVPN) in settings, or select a different server.",
+                closeBtn: "Close",
+                runSpeedTest: "Run Speed Test",
+                speedTestRunning: "Testing...",
+                fastest: "Fastest",
+                recentServers: "Recent Servers",
+                allServers: "All Servers",
+                latency: "Latency (ms) - Last 60s",
+                connectionMap: "Connection Map",
+                currentServer: "Current Server",
+                smartProxy: "Smart Proxy",
+                smartProxyDesc: "Route app traffic via proxy",
+                killSwitch: "Kill Switch",
+                killSwitchDesc: "Block internet if VPN drops",
+                batterySaver: "Battery Saver",
+                batterySaverDesc: "Reduce animations when disconnected",
+                launchStartup: "Launch at Startup",
+                launchStartupDesc: "Connect automatically on open",
+                language: "Language",
+                languageDesc: "Select app language",
+                selectServer: "Select Server",
+                searchPlaceholder: "Search by name or country...",
+                load: "Load",
+                loginTitle: "Secure VPN - Login",
+                loginEmail: "Email (Gmail) or Mobile Number",
+                loginPassword: "Password",
+                loginError: "Please enter email/mobile and password",
+                loginBtn: "Login",
+                loginOr: "OR",
+                loginGoogle: "Continue with Google",
+                mainTitle: "Secure VPN",
+                premiumTitle: "ProtonVPN Plus",
+                upgradePlus: "Upgrade to Plus",
+                upgradeDesc: "Get the most out of your privacy.",
+                feat1: "Highest speed servers (up to 10 Gbps)",
+                feat2: "Protect up to 10 devices at once",
+                feat3: "Strict no-logs policy",
+                feat4: "Access blocked content & streaming",
+                month1: "1 Month",
+                year1: "1 Year",
+                save49: "Save 49%",
+                payUpi: "Pay via UPI",
+                utrPlaceholder: "Enter UTR / Transaction ID",
+                verifyBtn: "Verify Payment",
+                privacyTitle: "Privacy Policy",
+                privacyDesc: "We value your privacy. This VPN application does not log your browsing history, traffic destination, data content, or DNS queries. Your connection is highly secured and encrypted. We ensure high-speed data transmission while maintaining strict privacy standards.",
+                iAgree: "I Agree",
+                paymentVerified: "Payment Verified",
+                welcomePlus: "Welcome to Plus! Your premium plan is now active.",
+                continueBtn: "Continue",
+                biometricLock: "Biometric Lock",
+                biometricLockDesc: "Require fingerprint/face to toggle connection",
+                dataUsage: "Data Usage (Session)",
+                downloaded: "Downloaded",
+                uploaded: "Uploaded",
+                totalUsage: "Total",
+                autoReconnect: "Auto-Reconnect",
+                autoReconnectDesc: "Reconnect automatically if dropped",
+                highPingWarning: "High latency detected. Performance may be degraded.",
+                systemTheme: "System Theme",
+                systemThemeDesc: "Auto-switch between dark and light modes",
+                dnsSettings: "DNS Settings",
+                dnsSettingsDesc: "Select your preferred DNS resolver",
+                dnsAutomatic: "Automatic",
+                faqTitle: "FAQ",
+                faqDesc: "Common questions & support",
+                faqQ1: "How secure is my connection?",
+                faqA1: "Your connection is secured with military-grade AES-256 encryption. We also support advanced protocols like WireGuard and OpenVPN to ensure your data remains completely private.",
+                faqQ2: "Do you keep any logs?",
+                faqA2: "No. We have a strict zero-logs policy. We do not track, collect, or share your browsing history, traffic destination, or DNS queries.",
+                faqQ3: "Will the VPN slow down my internet?",
+                faqA3: "While any VPN can slightly reduce speeds due to encryption overhead, our ultra-fast servers (up to 10 Gbps) ensure you experience minimal impact on speed or latency.",
+                faqQ4: "Connectivity Tips",
+                faqA4: "If you experience high latency or connection drops, try switching your protocol (e.g., swapping between WireGuard and OpenVPN) in settings, or select a different server.",
+                closeBtn: "Close",
+                runSpeedTest: "Run Speed Test",
+                speedTestRunning: "Testing...",
+                fastest: "Fastest",
+                recentServers: "Recent Servers",
+                allServers: "All Servers"
+            },
+            es: {
+                notConnected: "Desconectado",
+                tapToSecure: "Toca el botón para asegurar tu conexión.",
+                connecting: "Conectando...",
+                connectingDesc: "Conectando al servidor...",
+                connected: "Conectado de forma segura",
+                connectedDesc: "Tu tráfico está encriptado y enrutado de forma segura.",
+                download: "Descarga",
+                loginTitle: "VPN Seguro - Iniciar Sesión",
+                loginEmail: "Correo o Número de Móvil",
+                loginPassword: "Contraseña",
+                loginError: "Por favor ingrese correo/móvil y contraseña",
+                loginBtn: "Iniciar sesión",
+                loginOr: "O",
+                loginGoogle: "Continuar con Google",
+                mainTitle: "VPN Seguro",
+                premiumTitle: "ProtonVPN Plus",
+                upgradePlus: "Actualizar a Plus",
+                upgradeDesc: "Obtenga el máximo provecho de su privacidad.",
+                feat1: "Servidores de más alta velocidad (hasta 10 Gbps)",
+                feat2: "Proteja hasta 10 dispositivos a la vez",
+                feat3: "Estricta política de no registros",
+                feat4: "Acceda a contenido bloqueado y streaming",
+                month1: "1 Mes",
+                year1: "1 Año",
+                save49: "Ahorre 49%",
+                payUpi: "Pagar vía UPI",
+                utrPlaceholder: "Ingrese UTR / ID de Transacción",
+                verifyBtn: "Verificar Pago",
+                privacyTitle: "Política de Privacidad",
+                privacyDesc: "Valoramos su privacidad. Esta aplicación VPN no registra su historial de navegación, destino del tráfico, contenido de datos ni consultas DNS. Su conexión está altamente segura y encriptada. Garantizamos una transmisión de datos de alta velocidad mientras mantenemos estrictos estándares de privacidad.",
+                iAgree: "Acepto",
+                paymentVerified: "Pago Verificado",
+                welcomePlus: "¡Bienvenido a Plus! Su plan premium ahora está activo.",
+                continueBtn: "Continuar",
+                biometricLock: "Bloqueo Biométrico",
+                biometricLockDesc: "Requerir huella/rostro para conectar",
+                dataUsage: "Uso de Datos (Sesión)",
+                downloaded: "Descargado",
+                uploaded: "Subido",
+                totalUsage: "Total",
+                autoReconnect: "Autoreconectar",
+                autoReconnectDesc: "Reconectar automáticamente si se cae",
+                highPingWarning: "Alta latencia detectada. El rendimiento puede degradarse.",
+                systemTheme: "Tema del sistema",
+                systemThemeDesc: "Cambiar automáticamente entre modo oscuro y claro",
+                dnsSettings: "Configuración de DNS",
+                dnsSettingsDesc: "Seleccione su resolutor de DNS preferido",
+                dnsAutomatic: "Automático",
+                faqTitle: "Preguntas Frecuentes",
+                faqDesc: "Preguntas comunes y soporte",
+                faqQ1: "¿Qué tan segura es mi conexión?",
+                faqA1: "Su conexión está asegurada con cifrado de grado militar AES-256. También admitimos protocolos avanzados como WireGuard y OpenVPN para garantizar que sus datos permanezcan completamente privados.",
+                faqQ2: "¿Guardáis algún registro?",
+                faqA2: "No. Tenemos una estricta política de no registros. No rastreamos, recopilamos ni compartimos su historial de navegación, destino de tráfico ni consultas DNS.",
+                faqQ3: "¿La VPN ralentizará mi internet?",
+                faqA3: "Aunque cualquier VPN puede reducir ligeramente la velocidad debido a la encriptación, nuestros servidores ultrarrápidos (hasta 10 Gbps) garantizan un impacto mínimo.",
+                faqQ4: "Consejos de conectividad",
+                faqA4: "Si experimenta alta latencia o caídas, intente cambiar su protocolo (por ejemplo, de WireGuard a OpenVPN) en la configuración, o seleccione un servidor diferente.",
+                closeBtn: "Cerrar",
+                runSpeedTest: "Prueba de velocidad",
+                speedTestRunning: "Probando...",
+                fastest: "Más rápido",
+                recentServers: "Servidores recientes",
+                allServers: "Todos los servidores",
+                upload: "Carga",
+                loginTitle: "VPN Seguro - Iniciar Sesión",
+                loginEmail: "Correo o Número de Móvil",
+                loginPassword: "Contraseña",
+                loginError: "Por favor ingrese correo/móvil y contraseña",
+                loginBtn: "Iniciar sesión",
+                loginOr: "O",
+                loginGoogle: "Continuar con Google",
+                mainTitle: "VPN Seguro",
+                premiumTitle: "ProtonVPN Plus",
+                upgradePlus: "Actualizar a Plus",
+                upgradeDesc: "Obtenga el máximo provecho de su privacidad.",
+                feat1: "Servidores de más alta velocidad (hasta 10 Gbps)",
+                feat2: "Proteja hasta 10 dispositivos a la vez",
+                feat3: "Estricta política de no registros",
+                feat4: "Acceda a contenido bloqueado y streaming",
+                month1: "1 Mes",
+                year1: "1 Año",
+                save49: "Ahorre 49%",
+                payUpi: "Pagar vía UPI",
+                utrPlaceholder: "Ingrese UTR / ID de Transacción",
+                verifyBtn: "Verificar Pago",
+                privacyTitle: "Política de Privacidad",
+                privacyDesc: "Valoramos su privacidad. Esta aplicación VPN no registra su historial de navegación, destino del tráfico, contenido de datos ni consultas DNS. Su conexión está altamente segura y encriptada. Garantizamos una transmisión de datos de alta velocidad mientras mantenemos estrictos estándares de privacidad.",
+                iAgree: "Acepto",
+                paymentVerified: "Pago Verificado",
+                welcomePlus: "¡Bienvenido a Plus! Su plan premium ahora está activo.",
+                continueBtn: "Continuar",
+                biometricLock: "Bloqueo Biométrico",
+                biometricLockDesc: "Requerir huella/rostro para conectar",
+                dataUsage: "Uso de Datos (Sesión)",
+                downloaded: "Descargado",
+                uploaded: "Subido",
+                totalUsage: "Total",
+                autoReconnect: "Autoreconectar",
+                autoReconnectDesc: "Reconectar automáticamente si se cae",
+                highPingWarning: "Alta latencia detectada. El rendimiento puede degradarse.",
+                systemTheme: "Tema del sistema",
+                systemThemeDesc: "Cambiar automáticamente entre modo oscuro y claro",
+                dnsSettings: "Configuración de DNS",
+                dnsSettingsDesc: "Seleccione su resolutor de DNS preferido",
+                dnsAutomatic: "Automático",
+                faqTitle: "Preguntas Frecuentes",
+                faqDesc: "Preguntas comunes y soporte",
+                faqQ1: "¿Qué tan segura es mi conexión?",
+                faqA1: "Su conexión está asegurada con cifrado de grado militar AES-256. También admitimos protocolos avanzados como WireGuard y OpenVPN para garantizar que sus datos permanezcan completamente privados.",
+                faqQ2: "¿Guardáis algún registro?",
+                faqA2: "No. Tenemos una estricta política de no registros. No rastreamos, recopilamos ni compartimos su historial de navegación, destino de tráfico ni consultas DNS.",
+                faqQ3: "¿La VPN ralentizará mi internet?",
+                faqA3: "Aunque cualquier VPN puede reducir ligeramente la velocidad debido a la encriptación, nuestros servidores ultrarrápidos (hasta 10 Gbps) garantizan un impacto mínimo.",
+                faqQ4: "Consejos de conectividad",
+                faqA4: "Si experimenta alta latencia o caídas, intente cambiar su protocolo (por ejemplo, de WireGuard a OpenVPN) en la configuración, o seleccione un servidor diferente.",
+                closeBtn: "Cerrar",
+                runSpeedTest: "Prueba de velocidad",
+                speedTestRunning: "Probando...",
+                fastest: "Más rápido",
+                recentServers: "Servidores recientes",
+                allServers: "Todos los servidores",
+                latency: "Latencia (ms) - Últimos 60s",
+                connectionMap: "Mapa de conexión",
+                currentServer: "Servidor actual",
+                smartProxy: "Proxy Inteligente",
+                smartProxyDesc: "Enrutar tráfico a través de proxy",
+                killSwitch: "Kill Switch",
+                killSwitchDesc: "Bloquear internet si el VPN cae",
+                batterySaver: "Ahorro de batería",
+                batterySaverDesc: "Reducir animaciones desconectado",
+                launchStartup: "Iniciar al arrancar",
+                launchStartupDesc: "Conectar automáticamente al abrir",
+                language: "Idioma",
+                languageDesc: "Seleccionar idioma",
+                selectServer: "Seleccionar servidor",
+                searchPlaceholder: "Buscar por nombre o país...",
+                load: "Carga",
+                loginTitle: "VPN Seguro - Iniciar Sesión",
+                loginEmail: "Correo o Número de Móvil",
+                loginPassword: "Contraseña",
+                loginError: "Por favor ingrese correo/móvil y contraseña",
+                loginBtn: "Iniciar sesión",
+                loginOr: "O",
+                loginGoogle: "Continuar con Google",
+                mainTitle: "VPN Seguro",
+                premiumTitle: "ProtonVPN Plus",
+                upgradePlus: "Actualizar a Plus",
+                upgradeDesc: "Obtenga el máximo provecho de su privacidad.",
+                feat1: "Servidores de más alta velocidad (hasta 10 Gbps)",
+                feat2: "Proteja hasta 10 dispositivos a la vez",
+                feat3: "Estricta política de no registros",
+                feat4: "Acceda a contenido bloqueado y streaming",
+                month1: "1 Mes",
+                year1: "1 Año",
+                save49: "Ahorre 49%",
+                payUpi: "Pagar vía UPI",
+                utrPlaceholder: "Ingrese UTR / ID de Transacción",
+                verifyBtn: "Verificar Pago",
+                privacyTitle: "Política de Privacidad",
+                privacyDesc: "Valoramos su privacidad. Esta aplicación VPN no registra su historial de navegación, destino del tráfico, contenido de datos ni consultas DNS. Su conexión está altamente segura y encriptada. Garantizamos una transmisión de datos de alta velocidad mientras mantenemos estrictos estándares de privacidad.",
+                iAgree: "Acepto",
+                paymentVerified: "Pago Verificado",
+                welcomePlus: "¡Bienvenido a Plus! Su plan premium ahora está activo.",
+                continueBtn: "Continuar",
+                biometricLock: "Bloqueo Biométrico",
+                biometricLockDesc: "Requerir huella/rostro para conectar",
+                dataUsage: "Uso de Datos (Sesión)",
+                downloaded: "Descargado",
+                uploaded: "Subido",
+                totalUsage: "Total",
+                autoReconnect: "Autoreconectar",
+                autoReconnectDesc: "Reconectar automáticamente si se cae",
+                highPingWarning: "Alta latencia detectada. El rendimiento puede degradarse.",
+                systemTheme: "Tema del sistema",
+                systemThemeDesc: "Cambiar automáticamente entre modo oscuro y claro",
+                dnsSettings: "Configuración de DNS",
+                dnsSettingsDesc: "Seleccione su resolutor de DNS preferido",
+                dnsAutomatic: "Automático",
+                faqTitle: "Preguntas Frecuentes",
+                faqDesc: "Preguntas comunes y soporte",
+                faqQ1: "¿Qué tan segura es mi conexión?",
+                faqA1: "Su conexión está asegurada con cifrado de grado militar AES-256. También admitimos protocolos avanzados como WireGuard y OpenVPN para garantizar que sus datos permanezcan completamente privados.",
+                faqQ2: "¿Guardáis algún registro?",
+                faqA2: "No. Tenemos una estricta política de no registros. No rastreamos, recopilamos ni compartimos su historial de navegación, destino de tráfico ni consultas DNS.",
+                faqQ3: "¿La VPN ralentizará mi internet?",
+                faqA3: "Aunque cualquier VPN puede reducir ligeramente la velocidad debido a la encriptación, nuestros servidores ultrarrápidos (hasta 10 Gbps) garantizan un impacto mínimo.",
+                faqQ4: "Consejos de conectividad",
+                faqA4: "Si experimenta alta latencia o caídas, intente cambiar su protocolo (por ejemplo, de WireGuard a OpenVPN) en la configuración, o seleccione un servidor diferente.",
+                closeBtn: "Cerrar",
+                runSpeedTest: "Prueba de velocidad",
+                speedTestRunning: "Probando...",
+                fastest: "Más rápido",
+                recentServers: "Servidores recientes",
+                allServers: "Todos los servidores"
+            },
+            fr: {
+                notConnected: "Non Connecté",
+                tapToSecure: "Appuyez sur le bouton pour sécuriser.",
+                connecting: "Connexion...",
+                connectingDesc: "Connexion au serveur...",
+                connected: "Connecté en toute sécurité",
+                connectedDesc: "Votre trafic est crypté et sécurisé.",
+                download: "Télécharger",
+                loginTitle: "VPN Sécurisé - Connexion",
+                loginEmail: "E-mail ou Numéro de Mobile",
+                loginPassword: "Mot de passe",
+                loginError: "Veuillez entrer e-mail/mobile et mot de passe",
+                loginBtn: "Se connecter",
+                loginOr: "OU",
+                loginGoogle: "Continuer avec Google",
+                mainTitle: "VPN Sécurisé",
+                premiumTitle: "ProtonVPN Plus",
+                upgradePlus: "Passer à Plus",
+                upgradeDesc: "Tirez le meilleur parti de votre confidentialité.",
+                feat1: "Serveurs à très haut débit (jusqu'à 10 Gbps)",
+                feat2: "Protégez jusqu'à 10 appareils à la fois",
+                feat3: "Politique stricte de non-journalisation",
+                feat4: "Accéder au contenu bloqué et au streaming",
+                month1: "1 Mois",
+                year1: "1 An",
+                save49: "Économisez 49%",
+                payUpi: "Payer via UPI",
+                utrPlaceholder: "Entrer UTR / ID de Transaction",
+                verifyBtn: "Vérifier le Paiement",
+                privacyTitle: "Politique de Confidentialité",
+                privacyDesc: "Nous tenons à votre vie privée. Cette application VPN ne conserve pas d'historique de navigation, la destination du trafic, le contenu des données, ou requêtes DNS. Votre connexion est cryptée. Nous assurons la transmission à haute vitesse en respectant les normes de confidentialité.",
+                iAgree: "J'accepte",
+                paymentVerified: "Paiement Vérifié",
+                welcomePlus: "Bienvenue dans Plus! Votre plan premium est maintenant actif.",
+                continueBtn: "Continuer",
+                biometricLock: "Verrouillage Biométrique",
+                biometricLockDesc: "Nécessite empreinte/visage pour connecter",
+                dataUsage: "Données Utilisées",
+                downloaded: "Téléchargé",
+                uploaded: "Téléversé",
+                totalUsage: "Total",
+                autoReconnect: "Reconnexion Auto",
+                autoReconnectDesc: "Reconnecter automatiquement si coupé",
+                highPingWarning: "Latence élevée détectée. Les performances peuvent être dégradées.",
+                systemTheme: "Thème du système",
+                systemThemeDesc: "Basculer auto. entre les modes sombre et clair",
+                dnsSettings: "Paramètres DNS",
+                dnsSettingsDesc: "Sélectionnez votre résolveur DNS préféré",
+                dnsAutomatic: "Automatique",
+                faqTitle: "FAQ",
+                faqDesc: "Questions courantes et support",
+                faqQ1: "Quelle est la sécurité de ma connexion ?",
+                faqA1: "Votre connexion est sécurisée avec un cryptage militaire AES-256. Nous prenons également en charge des protocoles avancés comme WireGuard et OpenVPN.",
+                faqQ2: "Conservez-vous des journaux ?",
+                faqA2: "Non. Nous avons une politique stricte de zéro journal. Nous ne suivons, ne collectons ni ne partageons votre historique de navigation.",
+                faqQ3: "Le VPN va-t-il ralentir mon internet ?",
+                faqA3: "Bien que tout VPN puisse réduire légèrement les vitesses, nos serveurs ultra-rapides (jusqu'à 10 Gbps) garantissent un impact minimal.",
+                faqQ4: "Conseils de connectivité",
+                faqA4: "Si vous rencontrez une latence élevée ou des interruptions, essayez de changer de protocole (par exemple, de WireGuard à OpenVPN) dans les paramètres, ou choisissez un autre serveur.",
+                closeBtn: "Fermer",
+                runSpeedTest: "Test de vitesse",
+                speedTestRunning: "Test...",
+                fastest: "Le plus rapide",
+                recentServers: "Serveurs récents",
+                allServers: "Tous les serveurs",
+                upload: "Téléverser",
+                loginTitle: "VPN Sécurisé - Connexion",
+                loginEmail: "E-mail ou Numéro de Mobile",
+                loginPassword: "Mot de passe",
+                loginError: "Veuillez entrer e-mail/mobile et mot de passe",
+                loginBtn: "Se connecter",
+                loginOr: "OU",
+                loginGoogle: "Continuer avec Google",
+                mainTitle: "VPN Sécurisé",
+                premiumTitle: "ProtonVPN Plus",
+                upgradePlus: "Passer à Plus",
+                upgradeDesc: "Tirez le meilleur parti de votre confidentialité.",
+                feat1: "Serveurs à très haut débit (jusqu'à 10 Gbps)",
+                feat2: "Protégez jusqu'à 10 appareils à la fois",
+                feat3: "Politique stricte de non-journalisation",
+                feat4: "Accéder au contenu bloqué et au streaming",
+                month1: "1 Mois",
+                year1: "1 An",
+                save49: "Économisez 49%",
+                payUpi: "Payer via UPI",
+                utrPlaceholder: "Entrer UTR / ID de Transaction",
+                verifyBtn: "Vérifier le Paiement",
+                privacyTitle: "Politique de Confidentialité",
+                privacyDesc: "Nous tenons à votre vie privée. Cette application VPN ne conserve pas d'historique de navigation, la destination du trafic, le contenu des données, ou requêtes DNS. Votre connexion est cryptée. Nous assurons la transmission à haute vitesse en respectant les normes de confidentialité.",
+                iAgree: "J'accepte",
+                paymentVerified: "Paiement Vérifié",
+                welcomePlus: "Bienvenue dans Plus! Votre plan premium est maintenant actif.",
+                continueBtn: "Continuer",
+                biometricLock: "Verrouillage Biométrique",
+                biometricLockDesc: "Nécessite empreinte/visage pour connecter",
+                dataUsage: "Données Utilisées",
+                downloaded: "Téléchargé",
+                uploaded: "Téléversé",
+                totalUsage: "Total",
+                autoReconnect: "Reconnexion Auto",
+                autoReconnectDesc: "Reconnecter automatiquement si coupé",
+                highPingWarning: "Latence élevée détectée. Les performances peuvent être dégradées.",
+                systemTheme: "Thème du système",
+                systemThemeDesc: "Basculer auto. entre les modes sombre et clair",
+                dnsSettings: "Paramètres DNS",
+                dnsSettingsDesc: "Sélectionnez votre résolveur DNS préféré",
+                dnsAutomatic: "Automatique",
+                faqTitle: "FAQ",
+                faqDesc: "Questions courantes et support",
+                faqQ1: "Quelle est la sécurité de ma connexion ?",
+                faqA1: "Votre connexion est sécurisée avec un cryptage militaire AES-256. Nous prenons également en charge des protocoles avancés comme WireGuard et OpenVPN.",
+                faqQ2: "Conservez-vous des journaux ?",
+                faqA2: "Non. Nous avons une politique stricte de zéro journal. Nous ne suivons, ne collectons ni ne partageons votre historique de navigation.",
+                faqQ3: "Le VPN va-t-il ralentir mon internet ?",
+                faqA3: "Bien que tout VPN puisse réduire légèrement les vitesses, nos serveurs ultra-rapides (jusqu'à 10 Gbps) garantissent un impact minimal.",
+                faqQ4: "Conseils de connectivité",
+                faqA4: "Si vous rencontrez une latence élevée ou des interruptions, essayez de changer de protocole (par exemple, de WireGuard à OpenVPN) dans les paramètres, ou choisissez un autre serveur.",
+                closeBtn: "Fermer",
+                runSpeedTest: "Test de vitesse",
+                speedTestRunning: "Test...",
+                fastest: "Le plus rapide",
+                recentServers: "Serveurs récents",
+                allServers: "Tous les serveurs",
+                latency: "Latence (ms) - 60s",
+                connectionMap: "Carte de connexion",
+                currentServer: "Serveur actuel",
+                smartProxy: "Proxy intelligent",
+                smartProxyDesc: "Acheminer le trafic via un proxy",
+                killSwitch: "Kill Switch",
+                killSwitchDesc: "Bloquer l'internet si le VPN tombe",
+                batterySaver: "Économiseur de batterie",
+                batterySaverDesc: "Réduire l'animation déconnectée",
+                launchStartup: "Lancer au démarrage",
+                launchStartupDesc: "Se connecter à l'ouverture",
+                language: "Langue",
+                languageDesc: "Choisir la langue",
+                selectServer: "Choisir un serveur",
+                searchPlaceholder: "Rechercher par nom ou pays...",
+                load: "Charge",
+                loginTitle: "VPN Sécurisé - Connexion",
+                loginEmail: "E-mail ou Numéro de Mobile",
+                loginPassword: "Mot de passe",
+                loginError: "Veuillez entrer e-mail/mobile et mot de passe",
+                loginBtn: "Se connecter",
+                loginOr: "OU",
+                loginGoogle: "Continuer avec Google",
+                mainTitle: "VPN Sécurisé",
+                premiumTitle: "ProtonVPN Plus",
+                upgradePlus: "Passer à Plus",
+                upgradeDesc: "Tirez le meilleur parti de votre confidentialité.",
+                feat1: "Serveurs à très haut débit (jusqu'à 10 Gbps)",
+                feat2: "Protégez jusqu'à 10 appareils à la fois",
+                feat3: "Politique stricte de non-journalisation",
+                feat4: "Accéder au contenu bloqué et au streaming",
+                month1: "1 Mois",
+                year1: "1 An",
+                save49: "Économisez 49%",
+                payUpi: "Payer via UPI",
+                utrPlaceholder: "Entrer UTR / ID de Transaction",
+                verifyBtn: "Vérifier le Paiement",
+                privacyTitle: "Politique de Confidentialité",
+                privacyDesc: "Nous tenons à votre vie privée. Cette application VPN ne conserve pas d'historique de navigation, la destination du trafic, le contenu des données, ou requêtes DNS. Votre connexion est cryptée. Nous assurons la transmission à haute vitesse en respectant les normes de confidentialité.",
+                iAgree: "J'accepte",
+                paymentVerified: "Paiement Vérifié",
+                welcomePlus: "Bienvenue dans Plus! Votre plan premium est maintenant actif.",
+                continueBtn: "Continuer",
+                biometricLock: "Verrouillage Biométrique",
+                biometricLockDesc: "Nécessite empreinte/visage pour connecter",
+                dataUsage: "Données Utilisées",
+                downloaded: "Téléchargé",
+                uploaded: "Téléversé",
+                totalUsage: "Total",
+                autoReconnect: "Reconnexion Auto",
+                autoReconnectDesc: "Reconnecter automatiquement si coupé",
+                highPingWarning: "Latence élevée détectée. Les performances peuvent être dégradées.",
+                systemTheme: "Thème du système",
+                systemThemeDesc: "Basculer auto. entre les modes sombre et clair",
+                dnsSettings: "Paramètres DNS",
+                dnsSettingsDesc: "Sélectionnez votre résolveur DNS préféré",
+                dnsAutomatic: "Automatique",
+                faqTitle: "FAQ",
+                faqDesc: "Questions courantes et support",
+                faqQ1: "Quelle est la sécurité de ma connexion ?",
+                faqA1: "Votre connexion est sécurisée avec un cryptage militaire AES-256. Nous prenons également en charge des protocoles avancés comme WireGuard et OpenVPN.",
+                faqQ2: "Conservez-vous des journaux ?",
+                faqA2: "Non. Nous avons une politique stricte de zéro journal. Nous ne suivons, ne collectons ni ne partageons votre historique de navigation.",
+                faqQ3: "Le VPN va-t-il ralentir mon internet ?",
+                faqA3: "Bien que tout VPN puisse réduire légèrement les vitesses, nos serveurs ultra-rapides (jusqu'à 10 Gbps) garantissent un impact minimal.",
+                faqQ4: "Conseils de connectivité",
+                faqA4: "Si vous rencontrez une latence élevée ou des interruptions, essayez de changer de protocole (par exemple, de WireGuard à OpenVPN) dans les paramètres, ou choisissez un autre serveur.",
+                closeBtn: "Fermer",
+                runSpeedTest: "Test de vitesse",
+                speedTestRunning: "Test...",
+                fastest: "Le plus rapide",
+                recentServers: "Serveurs récents",
+                allServers: "Tous les serveurs"
+            },
+            de: {
+                notConnected: "Nicht verbunden",
+                tapToSecure: "Tippen Sie auf die Schaltfläche.",
+                connecting: "Verbinde...",
+                connectingDesc: "Verbinde mit Server...",
+                connected: "Sicher verbunden",
+                connectedDesc: "Ihr Datenverkehr ist verschlüsselt.",
+                download: "Download",
+                loginTitle: "Sicheres VPN - Login",
+                loginEmail: "E-Mail oder Handynummer",
+                loginPassword: "Passwort",
+                loginError: "Bitte E-Mail/Handynummer und Passwort eingeben",
+                loginBtn: "Anmelden",
+                loginOr: "ODER",
+                loginGoogle: "Weiter mit Google",
+                mainTitle: "Sicheres VPN",
+                premiumTitle: "ProtonVPN Plus",
+                upgradePlus: "Auf Plus upgraden",
+                upgradeDesc: "Holen Sie das Beste aus Ihrer Privatsphäre.",
+                feat1: "Höchstgeschwindigkeitsserver (bis zu 10 Gbps)",
+                feat2: "Schützen Sie bis zu 10 Geräte gleichzeitig",
+                feat3: "Strikte No-Logs-Richtlinie",
+                feat4: "Zugriff auf blockierte Inhalte & Streaming",
+                month1: "1 Monat",
+                year1: "1 Jahr",
+                save49: "Sparen Sie 49%",
+                payUpi: "Über UPI bezahlen",
+                utrPlaceholder: "UTR / Transaktions-ID eingeben",
+                verifyBtn: "Zahlung überprüfen",
+                privacyTitle: "Datenschutzrichtlinie",
+                privacyDesc: "Wir schätzen Ihre Privatsphäre. Diese VPN-Anwendung protokolliert nicht Ihren Browserverlauf, Ihr Verkehrsziel, Ihren Dateninhalt oder Ihre DNS-Anfragen. Ihre Verbindung ist hochgradig sicher und verschlüsselt.",
+                iAgree: "Ich stimme zu",
+                paymentVerified: "Zahlung bestätigt",
+                welcomePlus: "Willkommen bei Plus! Ihr Premium-Plan ist nun aktiv.",
+                continueBtn: "Weiter",
+                biometricLock: "Biometrische Sperre",
+                biometricLockDesc: "Fingerabdruck/Gesicht zum Verbinden erforderlich",
+                dataUsage: "Datenverbrauch",
+                downloaded: "Heruntergeladen",
+                uploaded: "Hochgeladen",
+                totalUsage: "Gesamt",
+                autoReconnect: "Auto-Wiederverbinden",
+                autoReconnectDesc: "Automatisch neu verbinden bei Abbruch",
+                highPingWarning: "Hohe Latenz erkannt. Leistung kann beeinträchtigt sein.",
+                systemTheme: "System-Design",
+                systemThemeDesc: "Automatisch zwischen Dunkel- und Hellmodus wechseln",
+                dnsSettings: "DNS-Einstellungen",
+                dnsSettingsDesc: "Wählen Sie Ihren bevorzugten DNS-Resolver",
+                dnsAutomatic: "Automatisch",
+                faqTitle: "FAQ",
+                faqDesc: "Häufige Fragen & Support",
+                faqQ1: "Wie sicher ist meine Verbindung?",
+                faqA1: "Ihre Verbindung ist mit militärischer AES-256-Verschlüsselung gesichert. Wir unterstützen auch fortschrittliche Protokolle wie WireGuard und OpenVPN.",
+                faqQ2: "Führen Sie Protokolle?",
+                faqA2: "Nein. Wir haben eine strikte Keine-Protokolle-Richtlinie. Wir verfolgen oder sammeln Ihren Browserverlauf nicht.",
+                faqQ3: "Wird das VPN mein Internet verlangsamen?",
+                faqA3: "Obwohl jedes VPN die Geschwindigkeit leicht reduzieren kann, sorgen unsere ultraschnellen Server für minimale Auswirkungen.",
+                faqQ4: "Verbindungstipps",
+                faqA4: "Bei hoher Latenz oder Verbindungsabbrüchen versuchen Sie, das Protokoll in den Einstellungen zu wechseln (z. B. von WireGuard zu OpenVPN) oder wählen Sie einen anderen Server.",
+                closeBtn: "Schließen",
+                runSpeedTest: "Geschwindigkeitstest",
+                speedTestRunning: "Testen...",
+                fastest: "Schnellster",
+                recentServers: "Letzte Server",
+                allServers: "Alle Server",
+                upload: "Upload",
+                loginTitle: "Sicheres VPN - Login",
+                loginEmail: "E-Mail oder Handynummer",
+                loginPassword: "Passwort",
+                loginError: "Bitte E-Mail/Handynummer und Passwort eingeben",
+                loginBtn: "Anmelden",
+                loginOr: "ODER",
+                loginGoogle: "Weiter mit Google",
+                mainTitle: "Sicheres VPN",
+                premiumTitle: "ProtonVPN Plus",
+                upgradePlus: "Auf Plus upgraden",
+                upgradeDesc: "Holen Sie das Beste aus Ihrer Privatsphäre.",
+                feat1: "Höchstgeschwindigkeitsserver (bis zu 10 Gbps)",
+                feat2: "Schützen Sie bis zu 10 Geräte gleichzeitig",
+                feat3: "Strikte No-Logs-Richtlinie",
+                feat4: "Zugriff auf blockierte Inhalte & Streaming",
+                month1: "1 Monat",
+                year1: "1 Jahr",
+                save49: "Sparen Sie 49%",
+                payUpi: "Über UPI bezahlen",
+                utrPlaceholder: "UTR / Transaktions-ID eingeben",
+                verifyBtn: "Zahlung überprüfen",
+                privacyTitle: "Datenschutzrichtlinie",
+                privacyDesc: "Wir schätzen Ihre Privatsphäre. Diese VPN-Anwendung protokolliert nicht Ihren Browserverlauf, Ihr Verkehrsziel, Ihren Dateninhalt oder Ihre DNS-Anfragen. Ihre Verbindung ist hochgradig sicher und verschlüsselt.",
+                iAgree: "Ich stimme zu",
+                paymentVerified: "Zahlung bestätigt",
+                welcomePlus: "Willkommen bei Plus! Ihr Premium-Plan ist nun aktiv.",
+                continueBtn: "Weiter",
+                biometricLock: "Biometrische Sperre",
+                biometricLockDesc: "Fingerabdruck/Gesicht zum Verbinden erforderlich",
+                dataUsage: "Datenverbrauch",
+                downloaded: "Heruntergeladen",
+                uploaded: "Hochgeladen",
+                totalUsage: "Gesamt",
+                autoReconnect: "Auto-Wiederverbinden",
+                autoReconnectDesc: "Automatisch neu verbinden bei Abbruch",
+                highPingWarning: "Hohe Latenz erkannt. Leistung kann beeinträchtigt sein.",
+                systemTheme: "System-Design",
+                systemThemeDesc: "Automatisch zwischen Dunkel- und Hellmodus wechseln",
+                dnsSettings: "DNS-Einstellungen",
+                dnsSettingsDesc: "Wählen Sie Ihren bevorzugten DNS-Resolver",
+                dnsAutomatic: "Automatisch",
+                faqTitle: "FAQ",
+                faqDesc: "Häufige Fragen & Support",
+                faqQ1: "Wie sicher ist meine Verbindung?",
+                faqA1: "Ihre Verbindung ist mit militärischer AES-256-Verschlüsselung gesichert. Wir unterstützen auch fortschrittliche Protokolle wie WireGuard und OpenVPN.",
+                faqQ2: "Führen Sie Protokolle?",
+                faqA2: "Nein. Wir haben eine strikte Keine-Protokolle-Richtlinie. Wir verfolgen oder sammeln Ihren Browserverlauf nicht.",
+                faqQ3: "Wird das VPN mein Internet verlangsamen?",
+                faqA3: "Obwohl jedes VPN die Geschwindigkeit leicht reduzieren kann, sorgen unsere ultraschnellen Server für minimale Auswirkungen.",
+                faqQ4: "Verbindungstipps",
+                faqA4: "Bei hoher Latenz oder Verbindungsabbrüchen versuchen Sie, das Protokoll in den Einstellungen zu wechseln (z. B. von WireGuard zu OpenVPN) oder wählen Sie einen anderen Server.",
+                closeBtn: "Schließen",
+                runSpeedTest: "Geschwindigkeitstest",
+                speedTestRunning: "Testen...",
+                fastest: "Schnellster",
+                recentServers: "Letzte Server",
+                allServers: "Alle Server",
+                latency: "Latenz (ms) - Letzte 60s",
+                connectionMap: "Verbindungskarte",
+                currentServer: "Aktueller Server",
+                smartProxy: "Smart Proxy",
+                smartProxyDesc: "Verkehr über Proxy umleiten",
+                killSwitch: "Kill Switch",
+                killSwitchDesc: "Internet blockieren bei VPN-Abbruch",
+                batterySaver: "Energiesparmodus",
+                batterySaverDesc: "Animationen reduzieren",
+                launchStartup: "Beim Start ausführen",
+                launchStartupDesc: "Automatisch verbinden",
+                language: "Sprache",
+                languageDesc: "Sprache wählen",
+                selectServer: "Server auswählen",
+                searchPlaceholder: "Suche nach Name oder Land...",
+                load: "Auslastung",
+                loginTitle: "Sicheres VPN - Login",
+                loginEmail: "E-Mail oder Handynummer",
+                loginPassword: "Passwort",
+                loginError: "Bitte E-Mail/Handynummer und Passwort eingeben",
+                loginBtn: "Anmelden",
+                loginOr: "ODER",
+                loginGoogle: "Weiter mit Google",
+                mainTitle: "Sicheres VPN",
+                premiumTitle: "ProtonVPN Plus",
+                upgradePlus: "Auf Plus upgraden",
+                upgradeDesc: "Holen Sie das Beste aus Ihrer Privatsphäre.",
+                feat1: "Höchstgeschwindigkeitsserver (bis zu 10 Gbps)",
+                feat2: "Schützen Sie bis zu 10 Geräte gleichzeitig",
+                feat3: "Strikte No-Logs-Richtlinie",
+                feat4: "Zugriff auf blockierte Inhalte & Streaming",
+                month1: "1 Monat",
+                year1: "1 Jahr",
+                save49: "Sparen Sie 49%",
+                payUpi: "Über UPI bezahlen",
+                utrPlaceholder: "UTR / Transaktions-ID eingeben",
+                verifyBtn: "Zahlung überprüfen",
+                privacyTitle: "Datenschutzrichtlinie",
+                privacyDesc: "Wir schätzen Ihre Privatsphäre. Diese VPN-Anwendung protokolliert nicht Ihren Browserverlauf, Ihr Verkehrsziel, Ihren Dateninhalt oder Ihre DNS-Anfragen. Ihre Verbindung ist hochgradig sicher und verschlüsselt.",
+                iAgree: "Ich stimme zu",
+                paymentVerified: "Zahlung bestätigt",
+                welcomePlus: "Willkommen bei Plus! Ihr Premium-Plan ist nun aktiv.",
+                continueBtn: "Weiter",
+                biometricLock: "Biometrische Sperre",
+                biometricLockDesc: "Fingerabdruck/Gesicht zum Verbinden erforderlich",
+                dataUsage: "Datenverbrauch",
+                downloaded: "Heruntergeladen",
+                uploaded: "Hochgeladen",
+                totalUsage: "Gesamt",
+                autoReconnect: "Auto-Wiederverbinden",
+                autoReconnectDesc: "Automatisch neu verbinden bei Abbruch",
+                highPingWarning: "Hohe Latenz erkannt. Leistung kann beeinträchtigt sein.",
+                systemTheme: "System-Design",
+                systemThemeDesc: "Automatisch zwischen Dunkel- und Hellmodus wechseln",
+                dnsSettings: "DNS-Einstellungen",
+                dnsSettingsDesc: "Wählen Sie Ihren bevorzugten DNS-Resolver",
+                dnsAutomatic: "Automatisch",
+                faqTitle: "FAQ",
+                faqDesc: "Häufige Fragen & Support",
+                faqQ1: "Wie sicher ist meine Verbindung?",
+                faqA1: "Ihre Verbindung ist mit militärischer AES-256-Verschlüsselung gesichert. Wir unterstützen auch fortschrittliche Protokolle wie WireGuard und OpenVPN.",
+                faqQ2: "Führen Sie Protokolle?",
+                faqA2: "Nein. Wir haben eine strikte Keine-Protokolle-Richtlinie. Wir verfolgen oder sammeln Ihren Browserverlauf nicht.",
+                faqQ3: "Wird das VPN mein Internet verlangsamen?",
+                faqA3: "Obwohl jedes VPN die Geschwindigkeit leicht reduzieren kann, sorgen unsere ultraschnellen Server für minimale Auswirkungen.",
+                faqQ4: "Verbindungstipps",
+                faqA4: "Bei hoher Latenz oder Verbindungsabbrüchen versuchen Sie, das Protokoll in den Einstellungen zu wechseln (z. B. von WireGuard zu OpenVPN) oder wählen Sie einen anderen Server.",
+                closeBtn: "Schließen",
+                runSpeedTest: "Geschwindigkeitstest",
+                speedTestRunning: "Testen...",
+                fastest: "Schnellster",
+                recentServers: "Letzte Server",
+                allServers: "Alle Server"
+            }
+        };
+
+        let currentLanguage = localStorage.getItem('appLang') || 'en';
+
+        
+        function showToast(message) {
+            const toast = document.getElementById('toast-container');
+            const toastMsg = document.getElementById('toast-message');
+            toastMsg.innerText = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function changeLanguage(lang) {
+            currentLanguage = lang;
+            localStorage.setItem('appLang', lang);
+            updateUIText();
+            
+            // Re-render servers list to translate "Load"
+            const searchInput = document.getElementById('server-search');
+            if (searchInput) {
+                renderServers(searchInput.value);
+            }
+        }
+
+        function updateUIText() {
+            const t = translations[currentLanguage];
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (t[key]) {
+                    el.innerText = t[key];
+                }
+            });
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                if (t[key]) {
+                    el.setAttribute('placeholder', t[key]);
+                }
+            });
+            
+            // Update connection status texts based on state
+            const title = document.getElementById('status-title');
+            const desc = document.getElementById('status-desc');
+            if (state.connectionStatus === 'DISCONNECTED') {
+                title.innerText = t.notConnected;
+                desc.innerText = t.tapToSecure;
+            } else if (state.connectionStatus === 'CONNECTING') {
+                title.innerText = t.connecting;
+                desc.innerText = t.connectingDesc;
+            } else if (state.connectionStatus === 'CONNECTED') {
+                title.innerText = t.connected;
+                desc.innerText = t.connectedDesc;
+            }
+        }
+
+        // Data
+        const userLocation = { lat: 20.5937, lng: 78.9629 }; // Example: India
+        const servers = [
+            { name: "United States", flag: "🇺🇸", ping: 45, premium: false, lat: 37.0902, lng: -95.7129 },
+            { name: "United Kingdom", flag: "🇬🇧", ping: 85, premium: false, lat: 55.3781, lng: -3.4360 },
+            { name: "Germany", flag: "🇩🇪", ping: 110, premium: false, lat: 51.1657, lng: 10.4515 },
+            { name: "Japan", flag: "🇯🇵", ping: 150, premium: false, lat: 36.2048, lng: 138.2529 },
+            { name: "Australia", flag: "🇦🇺", ping: 210, premium: false, lat: -25.2744, lng: 133.7751 },
+            { name: "Singapore", flag: "🇸🇬", ping: 180, premium: false, lat: 1.3521, lng: 103.8198 },
+            { name: "Canada", flag: "🇨🇦", ping: 60, premium: false, lat: 56.1304, lng: -106.3468 },
+            { name: "France", flag: "🇫🇷", ping: 100, premium: false, lat: 46.2276, lng: 2.2137 },
+            { name: "Brazil", flag: "🇧🇷", ping: 190, premium: false, lat: -14.2350, lng: -51.9253 },
+            { name: "India", flag: "🇮🇳", ping: 220, premium: false, lat: 20.5937, lng: 78.9629 },
+            { name: "South Korea", flag: "🇰🇷", ping: 145, premium: false, lat: 35.9078, lng: 127.7669 },
+            { name: "Netherlands", flag: "🇳🇱", ping: 105, premium: false, lat: 52.1326, lng: 5.2913 },
+            { name: "Switzerland", flag: "🇨🇭", ping: 95, premium: false, lat: 46.8182, lng: 8.2275 },
+            { name: "United Arab Emirates", flag: "🇦🇪", ping: 170, premium: false, lat: 23.4241, lng: 53.8478 },
+            { name: "Mauritius", flag: "🇲🇺", ping: 35, premium: true, lat: -20.3484, lng: 57.5522 },
+            { name: "Hong Kong", flag: "🇭🇰", ping: 20, premium: true, lat: 22.3193, lng: 114.1694 },
+            { name: "Sweden", flag: "🇸🇪", ping: 30, premium: true, lat: 60.1282, lng: 18.6435 },
+            { name: "Italy", flag: "🇮🇹", ping: 40, premium: true, lat: 41.8719, lng: 12.5674 },
+            { name: "Spain", flag: "🇪🇸", ping: 42, premium: true, lat: 40.4637, lng: -3.7492 }
+        ];
+
+        let state = {
+            isPremium: false,
+            connectionStatus: 'DISCONNECTED', // DISCONNECTED, CONNECTING, CONNECTED
+            currentServer: servers[0],
+            speedInterval: null,
+            latencyChart: null,
+            latencyData: Array(60).fill(0),
+            labels: Array(60).fill(''),
+            mapSvg: null,
+            mapProjection: null,
+            batterySaver: false,
+            launchAtStartup: localStorage.getItem('launchAtStartup') === 'true',
+            biometricLock: false,
+            lastPingWarningTime: 0,
+            autoReconnect: localStorage.getItem('autoReconnect') === 'true',
+            systemTheme: localStorage.getItem('systemTheme') !== 'false',
+            dns: localStorage.getItem('dns') || 'automatic',
+            totalDownloadData: 0,
+            totalUploadData: 0
+        };
+
+        // Navigation
+        function navigateTo(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        // Login
+        function handleLogin() {
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            
+            if ((user && pass) || event.target.innerText.includes('Google')) {
+                document.getElementById('login-error').style.display = 'none';
+                navigateTo('main-screen');
+                renderServers();
+            } else {
+                document.getElementById('login-error').style.display = 'block';
+            }
+        }
+
+        // VPN Logic
+        function drawMap() {
+            const container = document.getElementById('map-container');
+            const width = container.clientWidth || 300;
+            const height = container.clientHeight || 200;
+
+            const svg = d3.select("#map-container")
+                          .append("svg")
+                          .attr("width", "100%")
+                          .attr("height", "100%")
+                          .attr("viewBox", `0 0 ${width} ${height}`);
+
+            const projection = d3.geoMercator()
+                                 .scale(width / (2 * Math.PI))
+                                 .translate([width / 2, height / 1.5]);
+
+            const path = d3.geoPath().projection(projection);
+
+            d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json").then(function(topo) {
+                const countries = topojson.feature(topo, topo.objects.countries).features;
+                svg.append("g")
+                   .selectAll("path")
+                   .data(countries)
+                   .join("path")
+                   .attr("fill", "rgba(255, 255, 255, 0.1)")
+                   .attr("d", path)
+                   .style("stroke", "rgba(255, 255, 255, 0.2)")
+                   .style("stroke-width", 0.5);
+
+                state.mapSvg = svg;
+                state.mapProjection = projection;
+                updateMapConnection();
+            });
+        }
+
+        function updateMapConnection() {
+            if (!state.mapSvg || !state.mapProjection) return;
+
+            const svg = state.mapSvg;
+            const projection = state.mapProjection;
+
+            const userCoords = projection([userLocation.lng, userLocation.lat]);
+            const serverCoords = projection([state.currentServer.lng, state.currentServer.lat]);
+
+            // User Point
+            let userPoint = svg.select(".map-point-user");
+            if (userPoint.empty()) {
+                svg.append("circle")
+                   .attr("class", "map-point map-point-user")
+                   .attr("cx", userCoords[0])
+                   .attr("cy", userCoords[1])
+                   .attr("r", 4)
+                   .attr("fill", "#2196F3");
+            }
+
+            // Server Point
+            let serverPoint = svg.select(".map-point-server");
+            const serverColor = state.connectionStatus === 'CONNECTED' ? "#25C74B" : "#9e9e9e";
+            if (serverPoint.empty()) {
+                svg.append("circle")
+                   .attr("class", "map-point map-point-server")
+                   .attr("cx", serverCoords[0])
+                   .attr("cy", serverCoords[1])
+                   .attr("r", 4)
+                   .attr("fill", serverColor);
+            } else {
+                const animDuration = (state.batterySaver && state.connectionStatus === 'DISCONNECTED') ? 0 : 1000;
+                serverPoint.transition()
+                           .duration(animDuration)
+                           .attr("cx", serverCoords[0])
+                           .attr("cy", serverCoords[1])
+                           .attr("fill", serverColor);
+            }
+
+            // Connection Line
+            let link = svg.select(".map-link");
+            if (state.connectionStatus === 'CONNECTED' || state.connectionStatus === 'CONNECTING') {
+                const color = state.connectionStatus === 'CONNECTED' ? "#25C74B" : "#ff9800";
+                
+                // Draw curve
+                const dx = serverCoords[0] - userCoords[0],
+                      dy = serverCoords[1] - userCoords[1],
+                      dr = Math.sqrt(dx * dx + dy * dy) * 1.5;
+                
+                const pathData = `M${userCoords[0]},${userCoords[1]}A${dr},${dr} 0 0,1 ${serverCoords[0]},${serverCoords[1]}`;
+
+                if (link.empty()) {
+                    link = svg.append("path")
+                       .attr("class", "map-link")
+                       .attr("d", pathData)
+                       .style("fill", "none")
+                       .style("stroke", color)
+                       .style("stroke-width", 2)
+                       .style("stroke-dasharray", "5, 5")
+                       .style("opacity", 0.7);
+                       
+                    if (state.connectionStatus === 'CONNECTING') {
+                        // Animate stroke
+                        link.style("stroke-dashoffset", 50)
+                           .transition()
+                           .duration(2000)
+                           .ease(d3.easeLinear)
+                           .style("stroke-dashoffset", 0);
+                    }
+                } else {
+                    link.transition()
+                        .duration(1000)
+                        .attr("d", pathData)
+                        .style("stroke", color);
+                }
+            } else {
+                link.remove();
+            }
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('latencyChart').getContext('2d');
+            state.latencyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: state.labels,
+                    datasets: [{
+                        label: 'Latency (ms)',
+                        data: state.latencyData,
+                        borderColor: '#25C74B',
+                        backgroundColor: 'rgba(37, 199, 75, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    scales: {
+                        x: { display: false },
+                        y: { 
+                            display: true, 
+                            min: 0,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#9e9e9e', font: { size: 10 } }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        intersect: false
+                    }
+                }
+            });
+        }
+
+        
+        async function toggleConnection() {
+            if (state.connectionStatus === 'CONNECTING') return;
+
+            if (state.biometricLock) {
+                try {
+                    const challenge = new Uint8Array(32);
+                    window.crypto.getRandomValues(challenge);
+                    
+                    await navigator.credentials.create({
+                        publicKey: {
+                            challenge: challenge,
+                            rp: { name: "Secure VPN" },
+                            user: {
+                                id: new Uint8Array(16),
+                                name: "vpn_user",
+                                displayName: "VPN User"
+                            },
+                            pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+                            authenticatorSelection: {
+                                authenticatorAttachment: "platform",
+                                userVerification: "required"
+                            },
+                            timeout: 60000
+                        }
+                    });
+                } catch (e) {
+                    console.error("Biometric authentication failed or was canceled:", e);
+                    return; // Abort toggle
+                }
+            }
+            executeToggleConnection();
+        }
+
+
+        function triggerUnexpectedDisconnect() {
+            if (state.connectionStatus === 'CONNECTED') {
+                // Force disconnect
+                state.connectionStatus = 'DISCONNECTED';
+                document.getElementById('connect-wrapper').className = 'connect-btn-wrapper';
+                document.getElementById('status-title').innerText = 'Not Connected';
+                document.getElementById('status-title').style.color = 'var(--text-primary)';
+                document.getElementById('status-desc').innerText = 'Tap the button to secure your connection.';
+                document.getElementById('proxy-switch').disabled = false;
+                document.getElementById('kill-switch').disabled = false;
+                stopSpeedSimulation();
+                updateMapConnection();
+                updateUIText();
+                
+                if (state.autoReconnect) {
+                    setTimeout(() => {
+                        executeToggleConnection(); // attempt to reconnect to last used server
+                    }, 1000);
+                }
+            }
+        }
+
+        function executeToggleConnection() {
+            if (state.connectionStatus === 'CONNECTING') return;
+
+            const wrapper = document.getElementById('connect-wrapper');
+            const title = document.getElementById('status-title');
+            const desc = document.getElementById('status-desc');
+            const proxySwitch = document.getElementById('proxy-switch');
+            const killSwitch = document.getElementById('kill-switch');
+
+            if (state.connectionStatus === 'DISCONNECTED') {
+                // Connect
+                // Use last selected server
+                // state.currentServer remains the same
+
+                state.connectionStatus = 'CONNECTING';
+                wrapper.className = 'connect-btn-wrapper connecting';
+                title.innerText = 'Connecting...';
+                title.style.color = '#ff9800';
+                desc.innerText = 'Securing your connection...';
+                proxySwitch.disabled = true;
+                killSwitch.disabled = true;
+                updateMapConnection();
+
+                setTimeout(() => {
+                    state.connectionStatus = 'CONNECTED';
+                    wrapper.className = 'connect-btn-wrapper connected';
+                    title.innerText = 'Connected';
+                    title.style.color = 'var(--secondary-color)';
+                    desc.innerText = 'Your IP is hidden. Data is encrypted.';
+                    
+                    // Add to recent servers
+                    let recents = [];
+                    try {
+                        const stored = localStorage.getItem('recentServers');
+                        if (stored) recents = JSON.parse(stored);
+                    } catch(e) {}
+                    
+                    // Remove if already exists
+                    recents = recents.filter(s => s.name !== state.currentServer.name);
+                    
+                    // Add to beginning
+                    recents.unshift({
+                        name: state.currentServer.name,
+                        flag: state.currentServer.flag,
+                        premium: state.currentServer.premium
+                    });
+                    
+                    // Keep only last 3
+                    if (recents.length > 3) recents = recents.slice(0, 3);
+                    localStorage.setItem('recentServers', JSON.stringify(recents));
+
+                    startSpeedSimulation();
+                    updateMapConnection();
+                }, 2000);
+            } else {
+                // Disconnect
+                state.connectionStatus = 'DISCONNECTED';
+                wrapper.className = 'connect-btn-wrapper';
+                title.innerText = 'Not Connected';
+                title.style.color = 'var(--text-primary)';
+                desc.innerText = 'Tap the button to secure your connection.';
+                proxySwitch.disabled = false;
+                killSwitch.disabled = false;
+                stopSpeedSimulation();
+                updateMapConnection();
+            }
+            updateUIText();
+        }
+
+        
+        let speedTestInterval = null;
+
+        function runManualSpeedTest() {
+            if (state.connectionStatus !== 'CONNECTED') {
+                showToast(translations[currentLanguage].notConnected || "Not connected to VPN");
+                return;
+            }
+
+            const btn = document.getElementById('run-speed-test-btn');
+            btn.disabled = true;
+            btn.innerText = translations[currentLanguage].speedTestRunning || "Testing...";
+            btn.style.opacity = '0.5';
+
+            const dSpeed = document.getElementById('download-speed');
+            const uSpeed = document.getElementById('upload-speed');
+            const dTotal = document.getElementById('data-downloaded');
+            const uTotal = document.getElementById('data-uploaded');
+            const dataTotal = document.getElementById('data-total');
+
+            // Pause regular speed simulation if active
+            if (state.speedInterval) {
+                clearInterval(state.speedInterval);
+            }
+
+            let ticks = 0;
+            const maxTicks = 50; // 5 seconds (50 * 100ms)
+            
+            speedTestInterval = setInterval(() => {
+                const highDown = (Math.random() * (900.0 - 100.0) + 100.0).toFixed(1);
+                const highUp = (Math.random() * (200.0 - 50.0) + 50.0).toFixed(1);
+                
+                dSpeed.innerText = highDown + ' MB/s';
+                uSpeed.innerText = highUp + ' MB/s';
+                
+                state.totalDownloadData += parseFloat(highDown) / 10;
+                state.totalUploadData += parseFloat(highUp) / 10;
+                dTotal.innerText = state.totalDownloadData.toFixed(2) + ' MB';
+                uTotal.innerText = state.totalUploadData.toFixed(2) + ' MB';
+                dataTotal.innerText = (state.totalDownloadData + state.totalUploadData).toFixed(2) + ' MB';
+
+                ticks++;
+                if (ticks >= maxTicks) {
+                    clearInterval(speedTestInterval);
+                    btn.disabled = false;
+                    btn.innerText = translations[currentLanguage].runSpeedTest || "Run Speed Test";
+                    btn.style.opacity = '1';
+                    
+                    // Resume normal simulation
+                    if (state.connectionStatus === 'CONNECTED') {
+                        startSpeedSimulation();
+                    }
+                }
+            }, 100);
+        }
+
+        function startSpeedSimulation() {
+            const dSpeed = document.getElementById('download-speed');
+            const uSpeed = document.getElementById('upload-speed');
+            const dTotal = document.getElementById('data-downloaded');
+            const uTotal = document.getElementById('data-uploaded');
+            const dataTotal = document.getElementById('data-total');
+            
+            // Clear previous data
+            state.latencyData.fill(0);
+            
+            state.speedInterval = setInterval(() => {
+                const d = (Math.random() * (50.0 - 1.0) + 1.0).toFixed(1);
+                const u = (Math.random() * (10.0 - 0.5) + 0.5).toFixed(1);
+                dSpeed.innerText = d + ' MB/s';
+                uSpeed.innerText = u + ' MB/s';
+                
+                state.totalDownloadData += parseFloat(d);
+                state.totalUploadData += parseFloat(u);
+                dTotal.innerText = state.totalDownloadData.toFixed(2) + ' MB';
+                uTotal.innerText = state.totalUploadData.toFixed(2) + ' MB';
+                dataTotal.innerText = (state.totalDownloadData + state.totalUploadData).toFixed(2) + ' MB';
+                
+                // Simulate latency
+                const basePing = state.currentServer.ping;
+                const currentPing = Math.max(10, basePing + (Math.random() * 20 - 10)); // +/- 10ms variation
+                
+                state.latencyData.shift();
+                state.latencyData.push(currentPing);
+                
+                if (state.latencyChart) {
+                    state.latencyChart.update();
+                }
+                
+                if (currentPing > 200) {
+                    const now = Date.now();
+                    // Show warning once every 10 seconds
+                    if (now - state.lastPingWarningTime > 10000) {
+                        state.lastPingWarningTime = now;
+                        showToast(translations[currentLanguage].highPingWarning || "High latency detected.");
+                    }
+                }
+            }, 1000);
+        }
+
+        function stopSpeedSimulation() {
+            clearInterval(state.speedInterval);
+            document.getElementById('download-speed').innerText = '0.0 MB/s';
+            document.getElementById('upload-speed').innerText = '0.0 MB/s';
+            state.latencyData.fill(0);
+            
+            state.totalDownloadData = 0;
+            state.totalUploadData = 0;
+            document.getElementById('data-downloaded').innerText = '0.00 MB';
+            document.getElementById('data-uploaded').innerText = '0.00 MB';
+            document.getElementById('data-total').innerText = '0.00 MB';
+            
+            if (state.latencyChart) {
+                state.latencyChart.update();
+            }
+        }
+
+        // Servers
+        function renderServers(filterText = '') {
+            const container = document.getElementById('servers-container');
+            container.innerHTML = '';
+            
+            const lowerFilter = filterText.toLowerCase();
+
+            let serverList = servers.map((server, index) => ({ server, index }));
+            
+            let minPing = Infinity;
+            servers.forEach(s => {
+                if (s.ping < minPing) minPing = s.ping;
+            });
+            
+            // Render Recent Servers if not filtering
+            if (!lowerFilter) {
+                let recents = [];
+                try {
+                    const stored = localStorage.getItem('recentServers');
+                    if (stored) recents = JSON.parse(stored);
+                } catch(e) {}
+                
+                if (recents.length > 0) {
+                    const recentsHeader = document.createElement('div');
+                    recentsHeader.style.padding = '12px 8px 4px 8px';
+                    recentsHeader.style.fontSize = '12px';
+                    recentsHeader.style.fontWeight = '700';
+                    recentsHeader.style.color = 'var(--text-secondary)';
+                    recentsHeader.style.textTransform = 'uppercase';
+                    recentsHeader.innerText = translations[currentLanguage].recentServers || 'Recent Servers';
+                    container.appendChild(recentsHeader);
+                    
+                    recents.forEach((recent, rIndex) => {
+                        // Find full server object to get current ping/load
+                        const fullServerIndex = servers.findIndex(s => s.name === recent.name);
+                        const fullServer = fullServerIndex !== -1 ? servers[fullServerIndex] : recent;
+                        const originalIndex = fullServerIndex !== -1 ? fullServerIndex : 0; // Default to 0 if not found for some reason
+                        
+                        if (fullServer.load === undefined) {
+                            fullServer.load = Math.floor(Math.random() * 80) + 10;
+                        }
+                        if (fullServer.ping === undefined) {
+                            fullServer.ping = Math.floor(Math.random() * 100) + 20;
+                        }
+                        
+                        const pingClass = fullServer.ping < 100 ? 'ping-good' : 'ping-bad';
+                        const loadColor = fullServer.load < 50 ? '#4CAF50' : (fullServer.load < 80 ? '#FF9800' : '#F44336');
+                        const premiumHtml = fullServer.premium ? '<i class="fa-solid fa-crown premium-tag"></i>' : '';
+                        
+                        // Recent server HTML doesn't need favorite icon or fastest badge for simplicity, but we can include them
+                        const favoriteHtml = `<i class="${fullServer.favorite ? 'fa-solid' : 'fa-regular'} fa-star favorite-btn" onclick="toggleFavorite(event, ${originalIndex})" style="color: ${fullServer.favorite ? '#FFD700' : 'var(--text-secondary)'}; font-size: 20px; margin-right: 12px; cursor: pointer;"></i>`;
+                        
+                        const div = document.createElement('div');
+                        div.className = 'server-list-item';
+                        div.style.animationDelay = `${Math.min(rIndex * 0.05, 0.5)}s`;
+                        div.onclick = () => selectServer(originalIndex);
+                        div.innerHTML = `
+                            <div style="display: flex; align-items: center;">
+                                ${favoriteHtml}
+                                <span style="font-size: 28px; margin-right: 16px;">${fullServer.flag}</span>
+                                <span style="font-size: 16px; font-weight: 500; display: flex; align-items: center;">${fullServer.name} ${premiumHtml}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="font-size: 12px; font-weight: 600; color: ${loadColor}; background: ${loadColor}22; padding: 4px 8px; border-radius: 4px;">${translations[currentLanguage].load || 'Load'}: ${fullServer.load}%</div>
+                                <div class="${pingClass}">${fullServer.ping} ms</div>
+                            </div>
+                        `;
+                        container.appendChild(div);
+                    });
+                    
+                    const allHeader = document.createElement('div');
+                    allHeader.style.padding = '16px 8px 4px 8px';
+                    allHeader.style.fontSize = '12px';
+                    allHeader.style.fontWeight = '700';
+                    allHeader.style.color = 'var(--text-secondary)';
+                    allHeader.style.textTransform = 'uppercase';
+                    allHeader.innerText = translations[currentLanguage].allServers || 'All Servers';
+                    container.appendChild(allHeader);
+                }
+            }
+            
+            serverList.sort((a, b) => {
+                if (a.server.favorite && !b.server.favorite) return -1;
+                if (!a.server.favorite && b.server.favorite) return 1;
+                return 0;
+            });
+
+            serverList.forEach(({ server, index }) => {
+                if (lowerFilter && !server.name.toLowerCase().includes(lowerFilter)) {
+                    return;
+                }
+
+                if (server.load === undefined) {
+                    server.load = Math.floor(Math.random() * 80) + 10;
+                }
+
+                const pingClass = server.ping < 100 ? 'ping-good' : 'ping-bad';
+                const loadColor = server.load < 50 ? '#4CAF50' : (server.load < 80 ? '#FF9800' : '#F44336');
+                const premiumHtml = server.premium ? '<i class="fa-solid fa-crown premium-tag"></i>' : '';
+                const favoriteHtml = `<i class="${server.favorite ? 'fa-solid' : 'fa-regular'} fa-star favorite-btn" onclick="toggleFavorite(event, ${index})" style="color: ${server.favorite ? '#FFD700' : 'var(--text-secondary)'}; font-size: 20px; margin-right: 12px; cursor: pointer;"></i>`;
+                
+                const isFastest = server.ping === minPing;
+                const fastestStr = translations[currentLanguage].fastest || "Fastest";
+                const fastestBadgeHtml = isFastest ? `<span style="font-size: 10px; font-weight: 700; background: var(--primary-color); color: white; padding: 2px 6px; border-radius: 8px; margin-left: 8px; vertical-align: middle;">${fastestStr}</span>` : '';
+
+                const div = document.createElement('div');
+                div.className = 'server-list-item';
+                div.style.animationDelay = `${Math.min(index * 0.05, 0.5)}s`;
+                div.onclick = () => selectServer(index);
+                div.innerHTML = `
+                    <div style="display: flex; align-items: center;">
+                        ${favoriteHtml}
+                        <span style="font-size: 28px; margin-right: 16px;">${server.flag}</span>
+                        <span style="font-size: 16px; font-weight: 500; display: flex; align-items: center;">${server.name} ${premiumHtml} ${fastestBadgeHtml}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="font-size: 12px; font-weight: 600; color: ${loadColor}; background: ${loadColor}22; padding: 4px 8px; border-radius: 4px;">${translations[currentLanguage].load}: ${server.load}%</div>
+                        <div class="${pingClass}">${server.ping} ms</div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function toggleFavorite(event, index) {
+            event.stopPropagation();
+            servers[index].favorite = !servers[index].favorite;
+            const searchInput = document.getElementById('server-search');
+            renderServers(searchInput ? searchInput.value : '');
+        }
+
+        function filterServers() {
+            const searchInput = document.getElementById('server-search').value;
+            renderServers(searchInput);
+        }
+
+        function selectServer(index) {
+            const server = servers[index];
+            if (server.premium && !state.isPremium) {
+                closeAllOverlays();
+                navigateTo('premium-screen');
+                return;
+            }
+
+            state.currentServer = server;
+            document.getElementById('current-flag').innerText = server.flag;
+            document.getElementById('current-server-name').innerText = server.name;
+            
+            const pingEl = document.getElementById('current-ping');
+            pingEl.innerText = server.ping + ' ms';
+            pingEl.className = 'server-ping ' + (server.ping < 100 ? 'ping-good' : 'ping-bad');
+            
+            updateMapConnection();
+            closeAllOverlays();
+        }
+
+        // Premium Logic
+        function selectPlan(planId) {
+            document.getElementById('plan-1').classList.remove('selected');
+            document.getElementById('plan-2').classList.remove('selected');
+            document.getElementById('plan-' + planId).classList.add('selected');
+        }
+
+        function checkTransactionInput() {
+            const input = document.getElementById('transaction-id').value;
+            document.getElementById('verify-btn').disabled = input.length === 0;
+        }
+
+        function verifyPayment() {
+            const btn = document.getElementById('verify-btn');
+            const text = document.getElementById('verify-text');
+            const spinner = document.getElementById('verify-spinner');
+            
+            btn.disabled = true;
+            text.style.display = 'none';
+            spinner.style.display = 'inline-block';
+
+            setTimeout(() => {
+                text.style.display = 'inline-block';
+                spinner.style.display = 'none';
+                btn.disabled = false;
+                showDialog('success-dialog');
+            }, 2000);
+        }
+
+        function activatePremium() {
+            state.isPremium = true;
+            document.getElementById('premium-icon-btn').style.display = 'none'; // Hide premium icon in header
+            closeAllOverlays();
+            navigateTo('main-screen');
+        }
+
+        // Modals
+        function openServerList() {
+            if (state.connectionStatus === 'DISCONNECTED') {
+                const searchInput = document.getElementById('server-search');
+                if (searchInput) {
+                    searchInput.value = '';
+                }
+                renderServers();
+                document.getElementById('main-overlay').classList.add('active');
+                document.getElementById('server-list').classList.add('active');
+            }
+        }
+
+        function showDialog(dialogId) {
+            document.getElementById('main-overlay').classList.add('active');
+            document.getElementById(dialogId).classList.add('active');
+        }
+
+        function closeAllOverlays(event) {
+            if (event && event.target !== document.getElementById('main-overlay')) return;
+            
+            document.getElementById('main-overlay').classList.remove('active');
+            document.getElementById('server-list').classList.remove('active');
+            document.querySelectorAll('.dialog').forEach(d => d.classList.remove('active'));
+        }
+
+        
+        
+        function toggleAccordion(header) {
+            const content = header.nextElementSibling;
+            const icon = header.querySelector('i');
+            if (content.style.maxHeight) {
+                content.style.maxHeight = null;
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                content.style.maxHeight = content.scrollHeight + "px";
+                icon.style.transform = 'rotate(180deg)';
+            }
+        }
+
+        function applyTheme() {
+            if (state.systemTheme) {
+                if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+                    document.body.classList.add('light-mode');
+                } else {
+                    document.body.classList.remove('light-mode');
+                }
+            } else {
+                // Default dark
+                document.body.classList.remove('light-mode');
+            }
+        }
+
+        function toggleSystemTheme(enabled) {
+            state.systemTheme = enabled;
+            localStorage.setItem('systemTheme', enabled);
+            applyTheme();
+        }
+
+        if (window.matchMedia) {
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', e => {
+                if (state.systemTheme) {
+                    applyTheme();
+                }
+            });
+        }
+        
+        // Init
+        applyTheme();
+
+        // Init
+        renderServers();
+        initChart();
+        drawMap();
+
+        document.getElementById('launch-startup-switch').checked = state.launchAtStartup;
+        document.getElementById('auto-reconnect-switch').checked = state.autoReconnect;
+        document.getElementById('system-theme-switch').checked = state.systemTheme;
+        document.getElementById('dns-select').value = state.dns;
+        document.getElementById('language-select').value = currentLanguage;
+        updateUIText();
+
+        if (state.launchAtStartup) {
+            // Need a slight delay to allow D3 map to finish setting up
+            setTimeout(() => {
+                toggleConnection();
+            }, 500);
+        }
+
+        // Fluctuate server load
+        let loadTick = 0;
+        setInterval(() => {
+            if (state.batterySaver && state.connectionStatus === 'DISCONNECTED') {
+                loadTick++;
+                if (loadTick % 4 !== 0) return; // Update 4 times slower
+            }
+
+            let changed = false;
+            servers.forEach(server => {
+                if (server.load !== undefined) {
+                    // Fluctuate load by -5 to +5
+                    let change = Math.floor(Math.random() * 11) - 5;
+                    server.load = Math.max(10, Math.min(99, server.load + change));
+                    changed = true;
+                }
+            });
+            // Re-render if server list is visible
+            if (changed && document.getElementById('server-list').classList.contains('active')) {
+                const searchInput = document.getElementById('server-search');
+                renderServers(searchInput ? searchInput.value : '');
+            }
+        }, 3000);
+    </script>
+
+    <div id="toast-container" class="toast">
+        <span id="toast-message"></span>
+    </div>
+
+</body>
+</html>

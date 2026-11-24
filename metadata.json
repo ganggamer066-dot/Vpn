@@ -1,0 +1,6 @@
+{
+  "name": "Secure VPN",
+  "description": "High speed data and high security VPN connection interface with privacy policy.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
